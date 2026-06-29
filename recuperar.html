@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cambiar contraseña — qTurnos</title>
+<style>
+:root { color-scheme: light dark; }
+body { max-width: 420px; margin: 0 auto; padding: 40px 22px; font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1a2733; background: #fff; }
+@media (prefers-color-scheme: dark) { body { color: #e7eef5; background: #0e1621; } input { border-color: #2a3a4a; } }
+h1 { font-size: 22px; margin: 0 0 6px; }
+.hint { color: #5b7088; font-size: 14px; }
+label { display: block; margin: 18px 0 4px; font-weight: 600; }
+input { width: 100%; box-sizing: border-box; padding: 12px; font-size: 16px; border: 1px solid #b9c6d3; border-radius: 10px; background: transparent; color: inherit; }
+button { width: 100%; margin-top: 22px; padding: 14px; font-size: 16px; font-weight: 600; color: #fff; background: #0a7d6b; border: none; border-radius: 10px; cursor: pointer; }
+button:disabled { opacity: .6; }
+.msg { margin-top: 18px; padding: 12px 14px; border-radius: 10px; font-size: 14px; }
+.ok { background: rgba(10,125,107,.14); color: #0a7d6b; }
+.err { background: rgba(200,50,50,.14); color: #c23; }
+</style>
+</head>
+<body>
+<h1>🔁 Cambiar tu contraseña</h1>
+<p class="hint" id="estado">Comprobando el enlace…</p>
+<form id="form" hidden>
+<label for="p1">Contraseña nueva</label>
+<input id="p1" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres" />
+<label for="p2">Repite la contraseña</label>
+<input id="p2" type="password" autocomplete="new-password" placeholder="Otra vez" />
+<button id="btn" type="submit">Guardar contraseña</button>
+</form>
+<div id="resultado"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SB_URL = 'https://mivftyyzvibebuwhlnoa.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pdmZ0eXl6dmliZWJ1d2hsbm9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1NTQ3ODQsImV4cCI6MjA5NzEzMDc4NH0.xHqgAg3niIiZIa-_5y0_qpFW4_IosSwIS97_1tNVNG4';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+const $ = (id) => document.getElementById(id);
+let listo = false;
+function abrir() { if (listo) return; listo = true; $('estado').hidden = true; $('form').hidden = false; }
+function caducado() { if (!listo) $('estado').textContent = 'Este enlace no es válido o ha caducado. Pide otro desde la app (¿Olvidaste tu contraseña?).'; }
+// Si el enlace trae un error (caducado, ya usado), mostrarlo.
+const hash = new URLSearchParams(location.hash.slice(1));
+if (hash.get('error')) caducado();
+sb.auth.onAuthStateChange((event) => { if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') abrir(); });
+// Respaldo por si el evento ya pasó al cargar la página.
+setTimeout(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data.session) abrir();
+  else caducado();
+}, 1800);
+$('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const p1 = $('p1').value, p2 = $('p2').value, res = $('resultado');
+  if (p1.length < 6) { res.className = 'msg err'; res.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+  if (p1 !== p2) { res.className = 'msg err'; res.textContent = 'Las dos contraseñas no coinciden.'; return; }
+  $('btn').disabled = true; $('btn').textContent = 'Guardando…';
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  if (error) { res.className = 'msg err'; res.textContent = 'No se pudo cambiar: ' + error.message; $('btn').disabled = false; $('btn').textContent = 'Guardar contraseña'; return; }
+  $('form').hidden = true; res.className = 'msg ok'; res.textContent = '✅ Contraseña cambiada. Vuelve a la app qTurnos y entra con tu nueva contraseña.';
+});
+</script>
+</body>
+</html>
